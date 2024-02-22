@@ -1,6 +1,6 @@
 ﻿using Microsoft.VisualBasic.FileIO;
 
-﻿using NLog;
+using NLog;
 string path = Directory.GetCurrentDirectory() + "\\nlog.config";
 var logger = LogManager.LoadConfiguration(path).GetCurrentClassLogger();
 
@@ -12,7 +12,7 @@ do
     Console.WriteLine("1) Read from file.");
     Console.WriteLine("2) Write to file.");
     Console.WriteLine("Any other key to exit.");
-    choice = Console.ReadLine();
+    choice = Console.ReadLine() ?? "";
 
     if (choice == "1")
     {
@@ -24,18 +24,29 @@ do
             StreamReader sr = new StreamReader(file);
             sr.ReadLine();
 
+            int lineNumber = 1;
+
             while (!sr.EndOfStream)
             {
-                string line = sr.ReadLine();
-                TextFieldParser parser = new TextFieldParser(new StringReader(line));
-                parser.HasFieldsEnclosedInQuotes = true;
-                parser.SetDelimiters(",");
+                lineNumber++;
+                try
+                {
+                    string line = sr.ReadLine() ?? "";
+                    TextFieldParser parser = new TextFieldParser(new StringReader(line));
+                    parser.HasFieldsEnclosedInQuotes = true;
+                    parser.SetDelimiters(",");
 
-                string[] fields = parser.ReadFields();
+                    string[] fields = parser.ReadFields() ?? Array.Empty<string>();
 
-                Console.WriteLine($"{fields[0],-10}{fields[1],-80}{fields[2],-30}");
+                    Console.WriteLine($"{fields[0],-10}{fields[1],-80}{fields[2],-30}");
 
-                parser.Close();
+                    parser.Close();
+                }
+                catch
+                {
+                    Console.WriteLine($"Failed to parse line number {lineNumber}.");
+                    logger.Error($"Failed to parse line number {lineNumber}.");
+                }
             }
 
             sr.Close();
@@ -43,11 +54,11 @@ do
         else
         {
             Console.WriteLine("File not found.");
+            logger.Warn("File not found.");
         }
     }
     else if (choice == "2")
     {
-        StreamWriter sw = new StreamWriter(file, true);
         string resp = "Y";
         while (resp == "Y")
         {
@@ -61,9 +72,24 @@ do
             string movieTitle = Console.ReadLine();
             Console.WriteLine("Movie Genres:");
             string movieGenres = Console.ReadLine();
-            sw.WriteLine("{0},{1},{2}", movieID, movieTitle, movieGenres);
+
+            StreamReader sr = new StreamReader(file);
+            string fileContents = sr.ReadToEnd();
+            sr.Close();
+            if (fileContents.EndsWith("\n"))
+            {
+                StreamWriter sw = new StreamWriter(file, true);
+                sw.WriteLine("{0},{1},{2}", movieID, movieTitle, movieGenres);
+                sw.Close();
+            }
+            else
+            {
+                StreamWriter sw = new StreamWriter(file, true);
+                sw.WriteLine();
+                sw.WriteLine("{0},{1},{2}", movieID, movieTitle, movieGenres);
+                sw.Close();
+            }
         }
-        sw.Close();
     }
 
 } while (choice == "1" || choice == "2");
