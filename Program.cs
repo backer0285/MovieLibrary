@@ -4,7 +4,7 @@ using NLog;
 string path = Directory.GetCurrentDirectory() + "\\nlog.config";
 var logger = LogManager.LoadConfiguration(path).GetCurrentClassLogger();
 
-string file = "temp.csv"; // change to movies.csv for production
+string file = "temp.csv"; // TODO - change to movies.csv for production
 string choice;
 
 do
@@ -36,6 +36,8 @@ do
                     parser.HasFieldsEnclosedInQuotes = true;
                     parser.SetDelimiters(",");
 
+                    // TODO: implement pipe separation
+
                     string[] fields = parser.ReadFields() ?? Array.Empty<string>();
 
                     Console.WriteLine($"{fields[0],-10}{fields[1],-80}{fields[2],-30}");
@@ -63,31 +65,49 @@ do
         while (resp == "Y")
         {
             Console.WriteLine("Add a movie (Y/N)?");
-            resp = Console.ReadLine().ToUpper();
+            resp = (Console.ReadLine() ?? "").ToUpper();
+
             if (resp != "Y") { break; }
 
+            // TODO - check for duplicates
+            // TODO - handle imbedded quotes, pipes (if pipe separation is implemented)
             Console.WriteLine("Movie ID:");
-            string movieID = Console.ReadLine();
-            Console.WriteLine("Movie Title:");
-            string movieTitle = Console.ReadLine();
-            Console.WriteLine("Movie Genres:");
-            string movieGenres = Console.ReadLine();
-
-            StreamReader sr = new StreamReader(file);
-            string fileContents = sr.ReadToEnd();
-            sr.Close();
-            if (fileContents.EndsWith("\n"))
+            string movieID = Console.ReadLine() ?? "";
+            if (movieID.Contains(','))
             {
+                movieID = "\"" + movieID + "\"";
+            }
+            Console.WriteLine("Movie Title:");
+            string movieTitle = Console.ReadLine() ?? "";
+            if (movieTitle.Contains(','))
+            {
+                movieTitle = "\"" + movieTitle + "\"";
+            }
+            // TODO - implement autommatic pipe separation (loop to collect genres from user and write with pipe separation?)
+            Console.WriteLine("Movie Genres:");
+            string movieGenres = Console.ReadLine() ?? "";
+            if (movieGenres.Contains(','))
+            {
+                movieGenres = "\"" + movieGenres + "\"";
+            }
+
+            if (File.Exists(file))
+            {
+                StreamReader sr = new StreamReader(file);
+                string fileContents = sr.ReadToEnd();
+                sr.Close();
                 StreamWriter sw = new StreamWriter(file, true);
+                if (!fileContents.EndsWith("\n"))
+                {
+                    sw.WriteLine();
+                }
                 sw.WriteLine("{0},{1},{2}", movieID, movieTitle, movieGenres);
                 sw.Close();
             }
             else
             {
-                StreamWriter sw = new StreamWriter(file, true);
-                sw.WriteLine();
-                sw.WriteLine("{0},{1},{2}", movieID, movieTitle, movieGenres);
-                sw.Close();
+                Console.WriteLine("File not found.");
+                logger.Warn("File not found.");
             }
         }
     }
