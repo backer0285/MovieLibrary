@@ -1,10 +1,11 @@
-﻿using Microsoft.VisualBasic.FileIO;
+﻿using System.Text.RegularExpressions;
+using Microsoft.VisualBasic.FileIO;
 
 using NLog;
 string path = Directory.GetCurrentDirectory() + "\\nlog.config";
 var logger = LogManager.LoadConfiguration(path).GetCurrentClassLogger();
 
-string file = "temp.csv"; // TODO - change to movies.csv for production
+string file = "movies.csv"; // TODO - change to movies.csv for production
 string choice;
 
 do
@@ -24,6 +25,7 @@ do
             StreamReader sr = new StreamReader(file);
             sr.ReadLine();
 
+            // assumes first line of csv file is a header, rather than data
             int lineNumber = 1;
 
             while (!sr.EndOfStream)
@@ -33,14 +35,22 @@ do
                 {
                     string line = sr.ReadLine() ?? "";
                     TextFieldParser parser = new TextFieldParser(new StringReader(line));
+
+                    // deals with commas embedded in fields when quotes surround the field, throws failed to parse line error if quotes are within quotes
                     parser.HasFieldsEnclosedInQuotes = true;
                     parser.SetDelimiters(",");
 
-                    // TODO: implement pipe separation
-
                     string[] fields = parser.ReadFields() ?? Array.Empty<string>();
 
-                    Console.WriteLine($"{fields[0],-10}{fields[1],-80}{fields[2],-30}");
+                    fields[2] = fields[2].Replace("|", ", ");
+
+                    Console.WriteLine($"{fields[0],-20}{fields[1],-100}{fields[2],-30}");
+
+                    if (fields.Length > 3)
+                    {
+                        Console.WriteLine($"Row {lineNumber} in CSV file contained more than 3 fields. Some data was excluded.");
+                        logger.Warn($"Row {lineNumber} in CSV file contained more than 3 fields. Some data was excluded.");
+                    }
 
                     parser.Close();
                 }
@@ -70,22 +80,49 @@ do
             if (resp != "Y") { break; }
 
             // TODO - check for duplicates
-            // TODO - handle imbedded quotes, pipes (if pipe separation is implemented)
+
+            // if blocks check for embedded commas in fields and apply quotes around them to maintain reading ability
             Console.WriteLine("Movie ID:");
             string movieID = Console.ReadLine() ?? "";
             if (movieID.Contains(','))
             {
                 movieID = "\"" + movieID + "\"";
             }
+
             Console.WriteLine("Movie Title:");
             string movieTitle = Console.ReadLine() ?? "";
             if (movieTitle.Contains(','))
             {
                 movieTitle = "\"" + movieTitle + "\"";
             }
-            // TODO - implement autommatic pipe separation (loop to collect genres from user and write with pipe separation?)
-            Console.WriteLine("Movie Genres:");
-            string movieGenres = Console.ReadLine() ?? "";
+
+            string movieGenres = "";
+
+            Console.WriteLine("Add a genre (Y/N)?");
+            string genreResp = (Console.ReadLine() ?? "").ToUpper();
+
+            while (genreResp == "Y")
+            {
+                Console.WriteLine("Movie Genre:");
+                string movieGenre = Console.ReadLine() ?? "";
+
+                if (genreResp != "Y") { break; }
+
+                if (movieGenres == "")
+                {
+                    movieGenres = movieGenre;
+                }
+                else
+                {
+                    movieGenres = movieGenres + "|" + movieGenre;
+                }
+            }
+
+            if (movieGenres == "")
+            {
+                movieGenres = "(no genres listed)";
+            }
+
             if (movieGenres.Contains(','))
             {
                 movieGenres = "\"" + movieGenres + "\"";
@@ -97,6 +134,8 @@ do
                 string fileContents = sr.ReadToEnd();
                 sr.Close();
                 StreamWriter sw = new StreamWriter(file, true);
+
+                // ensures no run-on fields regardless of whether csv file ends with blank line or not
                 if (!fileContents.EndsWith("\n"))
                 {
                     sw.WriteLine();
